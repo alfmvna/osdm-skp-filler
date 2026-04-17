@@ -1,0 +1,40 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+
+# Flutter specific
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Android / iOS
+/android/
+/ios/
+/linux/
+/macos/
+/web/
+
+# Windows
+/windows/runner/CMakeLists.txt.user
+
+# Test coverage
+coverage/
+
+# Environment (NEVER commit real credentials)
+.env
+.env.local
+*.env
