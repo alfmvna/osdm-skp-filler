@@ -31,19 +31,19 @@ class ApiClient {
   /// Extract CSRF token from HTML response - tries multiple patterns
   String? extractCsrf(String html) {
     // Pattern 1: Standard input field
-    var match = RegExp(r'name="_csrf"\s+value="([^"]+)"').firstMatch(html);
+    var match = RegExp('name="_csrf"\\s+value="([^"]+)"').firstMatch(html);
     if (match != null) return match.group(1);
 
     // Pattern 2: Single quotes around value
-    match = RegExp(r'name="_csrf"\s+value=\'([^\']+)\'').firstMatch(html);
+    match = RegExp("name=\"_csrf\"\\s+value='([^']+)'").firstMatch(html);
     if (match != null) return match.group(1);
 
     // Pattern 3: Without quotes around name
-    match = RegExp(r'_csrf"\s+value="([^"]+)"').firstMatch(html);
+    match = RegExp('_csrf"\\s+value="([^"]+)"').firstMatch(html);
     if (match != null) return match.group(1);
 
     // Pattern 4: Meta tag (some frameworks use this)
-    match = RegExp(r'name=["\']csrf-token["\']\s+content=["\']([^"\']+)["\']').firstMatch(html);
+    match = RegExp('name=["\']csrf-token["\']\\s+content=["\']([^"\']+)["\']').firstMatch(html);
     if (match != null) return match.group(1);
 
     return null;
