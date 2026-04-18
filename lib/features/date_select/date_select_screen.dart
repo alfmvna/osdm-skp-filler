@@ -61,19 +61,31 @@ class _DateSelectScreenState extends State<DateSelectScreen> {
     // Can't select future dates
     if (day.isAfter(DateTime.now())) return false;
 
-    final dateStr = DateFormat('yyyy-MM-dd').format(day);
-    final workDay = _getWorkDay(dateStr);
-
-    // Can't select holidays or already filled
-    if (workDay == null) return false;
-    if (workDay.status == DayStatus.holiday) return false;
-    if (workDay.status == DayStatus.filled) return false;
-
     // Only weekdays
     if (day.weekday == DateTime.saturday || day.weekday == DateTime.sunday) {
       return false;
     }
 
+    final dateStr = DateFormat('yyyy-MM-dd').format(day);
+
+    // Check if this date exists in work days data
+    final workDay = _getWorkDay(dateStr);
+
+    // If workDay exists in data, check if it's a holiday
+    if (workDay != null) {
+      print('Date $dateStr found: ${workDay.status}');
+
+      // Only block holidays - filled and unfilled days can be selected
+      // (filled days can have more logs added)
+      if (workDay.status == DayStatus.holiday) return false;
+
+      // Both filled and unfilled days are selectable
+      return true;
+    }
+
+    // Date not found in work data - this might be a date with no log entries yet
+    // In this case, check if it's a weekday in the current month
+    print('Date $dateStr not found in workDays - allowing as potential unfilled day');
     return true;
   }
 
@@ -194,16 +206,13 @@ class _DateSelectScreenState extends State<DateSelectScreen> {
                             if (workDay != null) {
                               switch (workDay.status) {
                                 case DayStatus.filled:
-                                  bgColor = Colors.green.shade100;
+                                  // Filled days are also selectable (can add more logs)
+                                  bgColor = isSelected ? Colors.blue.shade100 : Colors.green.shade100;
                                   textColor = Colors.green.shade800;
                                   break;
                                 case DayStatus.unfilled:
-                                  bgColor = _isSelectable(day)
-                                      ? (isSelected ? Colors.blue.shade100 : Colors.orange.shade50)
-                                      : Colors.grey.shade200;
-                                  textColor = _isSelectable(day)
-                                      ? Colors.black87
-                                      : Colors.grey.shade500;
+                                  bgColor = isSelected ? Colors.blue.shade100 : Colors.orange.shade50;
+                                  textColor = Colors.black87;
                                   break;
                                 case DayStatus.holiday:
                                   bgColor = Colors.red.shade50;
@@ -211,8 +220,9 @@ class _DateSelectScreenState extends State<DateSelectScreen> {
                                   break;
                               }
                             } else {
-                              bgColor = Colors.grey.shade200;
-                              textColor = Colors.grey.shade500;
+                              // Date not in data - treat as potentially unfilled
+                              bgColor = isSelected ? Colors.blue.shade100 : Colors.orange.shade50;
+                              textColor = Colors.black87;
                             }
 
                             return GestureDetector(
@@ -261,14 +271,23 @@ class _DateSelectScreenState extends State<DateSelectScreen> {
                     // Legend
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: Column(
                         children: [
-                          _LegendDot(color: Colors.orange.shade50, border: Colors.orange, label: 'Belum Terisi'),
-                          const SizedBox(width: 16),
-                          _LegendDot(color: Colors.green.shade100, border: Colors.green, label: 'Sudah Terisi'),
-                          const SizedBox(width: 16),
-                          _LegendDot(color: Colors.red.shade50, border: Colors.red, label: 'Libur'),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _LegendDot(color: Colors.orange.shade50, border: Colors.orange, label: 'Belum Terisi'),
+                              const SizedBox(width: 16),
+                              _LegendDot(color: Colors.green.shade100, border: Colors.green, label: 'Sudah Terisi (bisa tambah)'),
+                              const SizedBox(width: 16),
+                              _LegendDot(color: Colors.red.shade50, border: Colors.red, label: 'Libur'),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Klik tanggal untuk memilih (sudah terisi bisa tambah log)',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                          ),
                         ],
                       ),
                     ),
