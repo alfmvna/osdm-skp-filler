@@ -92,7 +92,13 @@ class _DashboardViewState extends State<_DashboardView> {
 
           final loaded = state as DashboardLoaded;
           final data = loaded.calendarData;
-          final monthFormat = DateFormat('MMMM yyyy', 'id_ID');
+          // Indonesian month names
+          const indonesianMonths = [
+            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+          ];
+          final monthName = indonesianMonths[loaded.selectedMonth.month - 1];
+          final monthFormat = '$monthName ${loaded.selectedMonth.year}';
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -111,7 +117,7 @@ class _DashboardViewState extends State<_DashboardView> {
                             Icon(Icons.calendar_month, color: Theme.of(context).colorScheme.primary),
                             const SizedBox(width: 8),
                             Text(
-                              'Log Harian - ${monthFormat.format(loaded.selectedMonth)}',
+                              'Log Harian - $monthFormat',
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ],

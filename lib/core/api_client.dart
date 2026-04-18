@@ -31,19 +31,19 @@ class ApiClient {
   /// Extract CSRF token from HTML response (Yii framework uses YII_CSRF_TOKEN)
   String? extractCsrf(String html) {
     // Pattern 1: YII_CSRF_TOKEN (Yii Framework)
-    var match = RegExp(r'name=["\']YII_CSRF_TOKEN["\']\s+value=["\']([^"\']+)["\']').firstMatch(html);
+    var match = RegExp('name=["\']YII_CSRF_TOKEN["\']\\s+value=["\']([^"\']+)["\']').firstMatch(html);
     if (match != null) return match.group(1);
 
     // Pattern 1b: value before name
-    match = RegExp(r'value=["\']([^"\']+)["\']\s+name=["\']YII_CSRF_TOKEN["\']').firstMatch(html);
+    match = RegExp('value=["\']([^"\']+)["\']\\s+name=["\']YII_CSRF_TOKEN["\']').firstMatch(html);
     if (match != null) return match.group(1);
 
     // Pattern 2: Standard _csrf
-    match = RegExp(r'name=["\']_csrf["\']\s+value=["\']([^"\']+)["\']').firstMatch(html);
+    match = RegExp('name=["\']_csrf["\']\\s+value=["\']([^"\']+)["\']').firstMatch(html);
     if (match != null) return match.group(1);
 
     // Pattern 3: Meta tag
-    match = RegExp(r'name=["\']csrf-token["\']\s+content=["\']([^"\']+)["\']').firstMatch(html);
+    match = RegExp('name=["\']csrf-token["\']\\s+content=["\']([^"\']+)["\']').firstMatch(html);
     if (match != null) return match.group(1);
 
     return null;
@@ -116,8 +116,8 @@ class ApiClient {
       final resp = await _dio.post(
         ApiConstants.loginUrl,
         data: FormData.fromMap({
-          'nip': nip,
-          'password': password,
+          'LoginForm[username]': nip,
+          'LoginForm[password]': password,
           'YII_CSRF_TOKEN': _csrfToken,
         }),
         options: Options(
@@ -131,9 +131,44 @@ class ApiClient {
       );
 
       print('Login response status: ${resp.statusCode}');
+
+      // Status 302 means the server processed the login and is redirecting
+      // We need to check if the redirect goes to dashboard (success) or back to login (failed)
+      if (resp.statusCode == 302 || resp.statusCode == 301) {
+        // Try to fetch the calendar page - if we can access it, login was successful
+        try {
+          final calendarResp = await _dio.get(ApiConstants.calendarUrl);
+          final calendarHtml = calendarResp.data.toString();
+
+          // If we can see calendar content or logout button, login was successful
+          if (calendarHtml.contains('logout') || calendarHtml.contains('Log Harian') || calendarHtml.contains('kerja_')) {
+            await refreshCsrf();
+            return LoginResult(success: true);
+          }
+        } catch (e) {
+          // Calendar page failed - probably redirected to login, meaning login failed
+        }
+
+        // If calendar access failed, check login page for error messages
+        final checkResp = await _dio.get(ApiConstants.loginUrl);
+        final checkHtml = checkResp.data.toString();
+        if (checkHtml.contains('Password salah.') || checkHtml.contains('Username tidak valid')) {
+          return LoginResult(success: false, error: 'NIP atau Password salah');
+        }
+
+        return LoginResult(success: false, error: 'Login gagal. Status: ${resp.statusCode}');
+      }
+
       final html = resp.data.toString();
       print('Response contains logout: ${html.contains('logout')}');
       print('Response contains Log Harian: ${html.contains('Log Harian')}');
+      print('Response contains Kata Sandi: ${html.contains('Kata Sandi')}');
+      print('Response contains Username tidak valid: ${html.contains('Username tidak valid')}');
+      print('Response contains Password tidak valid: ${html.contains('Password tidak valid')}');
+      print('Response length: ${html.length}');
+      // Show first 500 chars of response for debugging
+      final preview = html.length > 500 ? html.substring(0, 500) : html;
+      print('Response preview: $preview');
 
       // Check if redirected to dashboard or still on login page
       // If login successful, should see dashboard content or logout button
@@ -141,7 +176,7 @@ class ApiClient {
         // Refresh CSRF from calendar page for subsequent requests
         await refreshCsrf();
         return LoginResult(success: true);
-      } else if (html.contains('Kata Sandi') || html.contains('Username tidak valid') || html.contains('Password tidak valid')) {
+      } else if (html.contains('Password salah.') || html.contains('Username tidak valid') || html.contains('Kata Sandi')) {
         return LoginResult(success: false, error: 'NIP atau Password salah');
       }
 
