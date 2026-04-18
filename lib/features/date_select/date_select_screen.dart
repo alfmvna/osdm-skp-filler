@@ -13,7 +13,7 @@ class DateSelectScreen extends StatefulWidget {
 
 class _DateSelectScreenState extends State<DateSelectScreen> {
   final ApiClient _api = ApiClient();
-  List<WorkDay> _workDays = [];
+  CalendarData? _calendarData;
   Set<String> _selectedDates = {};
   bool _loading = true;
   String? _error;
@@ -43,13 +43,18 @@ class _DateSelectScreenState extends State<DateSelectScreen> {
 
     final data = _api.parseCalendar(html);
     setState(() {
-      _workDays = data.workDays;
+      _calendarData = data;
       _loading = false;
     });
   }
 
+  List<WorkDay> get _currentMonthWorkDays {
+    if (_calendarData == null) return [];
+    return _calendarData!.workDaysInMonth(_focusedDay.year, _focusedDay.month);
+  }
+
   WorkDay? _getWorkDay(String dateStr) {
-    return _workDays.where((d) => d.date == dateStr).firstOrNull;
+    return _currentMonthWorkDays.where((d) => d.date == dateStr).firstOrNull;
   }
 
   bool _isSelectable(DateTime day) {

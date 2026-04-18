@@ -92,6 +92,11 @@ class _DashboardViewState extends State<_DashboardView> {
 
           final loaded = state as DashboardLoaded;
           final data = loaded.calendarData;
+          // Filter data by selected month
+          final monthWorkDays = data.workDaysInMonth(loaded.selectedMonth.year, loaded.selectedMonth.month);
+          final monthFilled = monthWorkDays.where((d) => d.status == DayStatus.filled).toList();
+          final monthUnfilled = monthWorkDays.where((d) => d.status == DayStatus.unfilled).toList();
+          final monthHolidays = monthWorkDays.where((d) => d.status == DayStatus.holiday).toList();
           // Indonesian month names
           const indonesianMonths = [
             'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -128,19 +133,19 @@ class _DashboardViewState extends State<_DashboardView> {
                           children: [
                             _StatChip(
                               label: 'Terisi',
-                              value: '${data.filledDays.length}',
+                              value: '${monthFilled.length}',
                               color: Colors.green,
                               icon: Icons.check_circle,
                             ),
                             _StatChip(
                               label: 'Belum Terisi',
-                              value: '${data.unfilledDays.length}',
+                              value: '${monthUnfilled.length}',
                               color: Colors.grey,
                               icon: Icons.circle_outlined,
                             ),
                             _StatChip(
                               label: 'Libur',
-                              value: '${data.holidays.length}',
+                              value: '${monthHolidays.length}',
                               color: Colors.red[300]!,
                               icon: Icons.event_busy,
                             ),
@@ -184,7 +189,7 @@ class _DashboardViewState extends State<_DashboardView> {
                       calendarBuilders: CalendarBuilders(
                         defaultBuilder: (context, day, focusedDay) {
                           final dateStr = DateFormat('yyyy-MM-dd').format(day);
-                          final workDay = data.workDays.where(
+                          final workDay = monthWorkDays.where(
                             (d) => d.date == dateStr,
                           ).firstOrNull;
 
@@ -230,6 +235,8 @@ class _DashboardViewState extends State<_DashboardView> {
                           _selectedDay = selectedDay;
                           _focusedDay = focusedDay;
                         });
+                        // Show log details for selected date
+                        _showLogDetails(context, selectedDay, monthWorkDays);
                       },
                       onFormatChanged: (format) {
                         setState(() {
@@ -305,7 +312,7 @@ class _DashboardViewState extends State<_DashboardView> {
                 const SizedBox(height: 16),
 
                 // Unfilled days list
-                if (data.unfilledDays.isNotEmpty) ...[
+                if (monthUnfilled.isNotEmpty) ...[
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(12),
@@ -317,7 +324,7 @@ class _DashboardViewState extends State<_DashboardView> {
                               Icon(Icons.warning_amber, color: Colors.orange[700], size: 20),
                               const SizedBox(width: 8),
                               Text(
-                                'Tanggal Belum Terisi',
+                                'Tanggal Belum Terisi - $monthFormat',
                                 style: Theme.of(context).textTheme.titleSmall,
                               ),
                             ],
@@ -326,7 +333,7 @@ class _DashboardViewState extends State<_DashboardView> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: data.unfilledDays.map((d) {
+                            children: monthUnfilled.map((d) {
                               final date = d.dateTime;
                               return Chip(
                                 avatar: const Icon(Icons.circle_outlined, size: 16),
@@ -349,6 +356,56 @@ class _DashboardViewState extends State<_DashboardView> {
         },
       ),
     );
+  }
+
+  void _showLogDetails(BuildContext context, DateTime date, List<WorkDay> monthWorkDays) {
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final workDay = monthWorkDays.where((d) => d.date == dateStr).firstOrNull;
+
+    if (workDay == null) {
+      // No log entry for this date
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Tidak ada log untuk ${DateFormat('dd MMM yyyy', 'id_ID').format(date)}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Show simple dialog with log details
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(DateFormat('dd MMMM yyyy', 'id_ID').format(date)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _DetailRow('Status', _getStatusText(workDay.status)),
+            const SizedBox(height: 8),
+            _DetailRow('Aktivitas', workDay.title),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getStatusText(DayStatus status) {
+    switch (status) {
+      case DayStatus.filled:
+        return 'Terisi ✓';
+      case DayStatus.unfilled:
+        return 'Belum Terisi';
+      case DayStatus.holiday:
+        return 'Libur';
+    }
   }
 }
 
@@ -420,6 +477,33 @@ class _LegendItem extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Text(text, style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DetailRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            '$label:',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+            ),
+          ),
+        ),
+        Expanded(child: Text(value)),
       ],
     );
   }

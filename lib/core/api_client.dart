@@ -198,15 +198,25 @@ class ApiClient {
   /// Get calendar page HTML
   Future<String?> getCalendarPage() async {
     try {
+      print('Fetching calendar from: ${ApiConstants.calendarUrl}');
       final resp = await _dio.get(ApiConstants.calendarUrl);
+      print('Calendar response status: ${resp.statusCode}');
       if (resp.statusCode == 200) {
         final html = resp.data.toString();
+        print('Calendar HTML length: ${html.length}');
+        print('Contains logout: ${html.contains('logout')}');
+        print('Contains Log Harian: ${html.contains('Log Harian')}');
+        print('Contains kerja_: ${html.contains('kerja_')}');
+        // Show first 500 chars for debugging
+        final preview = html.length > 500 ? html.substring(0, 500) : html;
+        print('Calendar preview: $preview');
         final token = extractCsrf(html);
         if (token != null) _csrfToken = token;
         return html;
       }
       return null;
     } catch (e) {
+      print('Error fetching calendar: $e');
       return null;
     }
   }
@@ -215,37 +225,62 @@ class ApiClient {
   CalendarData parseCalendar(String html) {
     final List<WorkDay> workDays = [];
 
-    // Parse Evo Calendar event structure from JS
-    // Pattern: id:"kerja_DD_MM_YYYY", title:"...", ...
-    final eventRegex = RegExp('id\\s*:\\s*["\']kerja_(\\d+)_(\\d+)_(\\d+)["\']\\s*,\\s*title\\s*:\\s*["\']([^"\']+)["\']');
-    final matches = eventRegex.allMatches(html);
+    print('Parsing calendar HTML...');
+    print('HTML contains kerja_: ${html.contains('kerja_')}');
+    print('HTML contains myEvents: ${html.contains('myEvents')}');
 
-    for (final match in matches) {
-      final day = match.group(1)!;
-      final month = match.group(2)!;
-      final year = match.group(3)!;
-      final title = match.group(4)!;
+    // Parse myEvents JSON array from JavaScript
+    // Pattern: myEvents = [{"id":"kerja_XXX","name":"...","description":"...","date":"YYYY-MM-DD","type":"...","everyYear":...},...]
+    final eventsRegex = RegExp('myEvents\\s*=\\s*(\\[\\{[^}]+\"date\"[^}]+\\}(?:,\\{[^}]+\"date\"[^}]+\\})*\\])', dotAll: true);
+    final eventsMatch = eventsRegex.firstMatch(html);
 
-      final dateStr = '$year-${month.padLeft(2, '0')}-${day.padLeft(2, '0')}';
-      final status = title.contains('Belum Terisi')
-          ? DayStatus.unfilled
-          : title.contains('Libur')
-              ? DayStatus.holiday
-              : DayStatus.filled;
+    if (eventsMatch != null) {
+      print('Found myEvents array');
+      final eventsJson = eventsMatch.group(1)!;
+      print('Events JSON length: ${eventsJson.length}');
 
-      workDays.add(WorkDay(
-        date: dateStr,
-        status: status,
-        title: title,
-      ));
+      // Parse individual events from the JSON-like string
+      // Pattern for each event: {"id":"kerja_XXX","name":"...","description":"...","date":"YYYY-MM-DD","type":"...","everyYear":...}
+      final eventRegex = RegExp('\\{"id":"kerja_[^"]+","name":"([^"]*)","description":"([^"]*)","date":"(\\d{4}-\\d{2}-\\d{2})"[^}]*\\}');
+      final matches = eventRegex.allMatches(eventsJson);
+
+      print('Found ${matches.length} calendar events');
+
+      for (final match in matches) {
+        final name = match.group(1)!;
+        final description = match.group(2)!;
+        final date = match.group(3)!;
+
+        // Determine status based on name and description
+        final status = name.contains('Belum Terisi') || description.contains('Belum Terisi')
+            ? DayStatus.unfilled
+            : (name.contains('Libur') || name.contains('Cuti') || description.contains('Libur'))
+                ? DayStatus.holiday
+                : DayStatus.filled;
+
+        final title = name.isEmpty ? description : name;
+
+        print('Parsed event: $date - $title - $status');
+
+        workDays.add(WorkDay(
+          date: date,
+          status: status,
+          title: title,
+        ));
+      }
+    } else {
+      print('myEvents pattern not found!');
     }
 
     // Also try to find "Belum Terisi (X)" counter
     int? unfilledCount;
-    final counterMatch = RegExp(r'Belum Terisi\s*\((\d+)\)').firstMatch(html);
+    final counterMatch = RegExp('Belum Terisi\\s*\\((\\d+)\\)').firstMatch(html);
     if (counterMatch != null) {
       unfilledCount = int.tryParse(counterMatch.group(1)!);
     }
+
+    print('Total workDays parsed: ${workDays.length}');
+    print('Unfilled count from page: $unfilledCount');
 
     return CalendarData(workDays: workDays, unfilledCount: unfilledCount);
   }
@@ -394,9 +429,22 @@ class CalendarData {
   final int? unfilledCount;
   CalendarData({required this.workDays, this.unfilledCount});
 
+  // Filter workDays by month
+  List<WorkDay> workDaysInMonth(int year, int month) {
+    return workDays.where((d) {
+      final dt = d.dateTime;
+      return dt.year == year && dt.month == month;
+    }).toList();
+  }
+
   List<WorkDay> get filledDays => workDays.where((d) => d.status == DayStatus.filled).toList();
   List<WorkDay> get unfilledDays => workDays.where((d) => d.status == DayStatus.unfilled).toList();
   List<WorkDay> get holidays => workDays.where((d) => d.status == DayStatus.holiday).toList();
+
+  // Get counts for specific month
+  int filledCountInMonth(int year, int month) => workDaysInMonth(year, month).where((d) => d.status == DayStatus.filled).length;
+  int unfilledCountInMonth(int year, int month) => workDaysInMonth(year, month).where((d) => d.status == DayStatus.unfilled).length;
+  int holidayCountInMonth(int year, int month) => workDaysInMonth(year, month).where((d) => d.status == DayStatus.holiday).length;
 }
 
 class LogEntry {
