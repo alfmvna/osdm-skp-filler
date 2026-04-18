@@ -19,8 +19,8 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
   final _formKey = GlobalKey<FormState>();
   final _aktivitasController = TextEditingController();
   final _deskripsiController = TextEditingController();
-  final _kuantitasController = TextEditingController(text: '1');
-  final _satuanController = TextEditingController(text: 'kegiatan');
+  final _kuantitasController = TextEditingController();  // Default kosong
+  final _satuanController = TextEditingController();  // Default kosong
   final _linkController = TextEditingController();
 
   String? _selectedGroup;
@@ -379,11 +379,10 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
                   child: TextFormField(
                     controller: _kuantitasController,
                     decoration: const InputDecoration(
-                      labelText: 'Kuantitas Output',
+                      labelText: 'Kuantitas Output (opsional)',
                       prefixIcon: Icon(Icons.numbers),
                     ),
                     keyboardType: TextInputType.number,
-                    validator: (v) => v == null || v.isEmpty ? 'Harus diisi' : null,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -392,7 +391,7 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
                   child: TextFormField(
                     controller: _satuanController,
                     decoration: const InputDecoration(
-                      labelText: 'Satuan',
+                      labelText: 'Satuan (opsional)',
                       prefixIcon: Icon(Icons.straighten),
                     ),
                   ),
@@ -405,7 +404,7 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
             TextFormField(
               controller: _linkController,
               decoration: const InputDecoration(
-                labelText: 'Link / Tautan (opsional)',
+                labelText: 'Link / Tautan',
                 prefixIcon: Icon(Icons.link),
                 hintText: 'https://...',
               ),
