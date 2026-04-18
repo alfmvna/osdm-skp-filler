@@ -29,20 +29,21 @@ class ApiClient {
   CookieJar? get cookieJar => _cookieJar;
 
   /// Extract CSRF token from HTML response - tries multiple patterns
+  /// Extract CSRF token from HTML response (Yii framework uses YII_CSRF_TOKEN)
   String? extractCsrf(String html) {
-    // Pattern 1: Standard input field
-    var match = RegExp(r'name="_csrf"\s+value="([^"]+)"').firstMatch(html);
+    // Pattern 1: YII_CSRF_TOKEN (Yii Framework)
+    var match = RegExp(r'name=["\']YII_CSRF_TOKEN["\']\s+value=["\']([^"\']+)["\']').firstMatch(html);
     if (match != null) return match.group(1);
 
-    // Pattern 2: Single quotes around value
-    match = RegExp(r'name="_csrf"\s+value=\'([^\']+)\'').firstMatch(html);
+    // Pattern 1b: value before name
+    match = RegExp(r'value=["\']([^"\']+)["\']\s+name=["\']YII_CSRF_TOKEN["\']').firstMatch(html);
     if (match != null) return match.group(1);
 
-    // Pattern 3: Without quotes around name
-    match = RegExp(r'_csrf"\s+value="([^"]+)"').firstMatch(html);
+    // Pattern 2: Standard _csrf
+    match = RegExp(r'name=["\']_csrf["\']\s+value=["\']([^"\']+)["\']').firstMatch(html);
     if (match != null) return match.group(1);
 
-    // Pattern 4: Meta tag (some frameworks use this)
+    // Pattern 3: Meta tag
     match = RegExp(r'name=["\']csrf-token["\']\s+content=["\']([^"\']+)["\']').firstMatch(html);
     if (match != null) return match.group(1);
 
@@ -118,7 +119,7 @@ class ApiClient {
         data: FormData.fromMap({
           'nip': nip,
           'password': password,
-          '_csrf': _csrfToken,
+          'YII_CSRF_TOKEN': _csrfToken,
         }),
         options: Options(
           contentType: 'application/x-www-form-urlencoded',
@@ -235,7 +236,7 @@ class ApiClient {
       final resp = await _dio.post(
         ApiConstants.saveLogUrl,
         data: FormData.fromMap({
-          '_csrf': _csrfToken,
+          'YII_CSRF_TOKEN': _csrfToken,
           'THarianLog[nama_aktivitas]': namaAktivitas,
           'THarianLog[deskripsi]': deskripsi,
           'THarianLog[tanggal]': tanggal,
@@ -250,7 +251,7 @@ class ApiClient {
       final html = resp.data.toString();
       if (html.contains('success') || html.contains('berhasil') || resp.statusCode == 200) {
         return SubmitResult(success: true);
-      } else if (html.contains('_csrf')) {
+      } else if (html.contains('YII_CSRF_TOKEN') || html.contains('_csrf')) {
         return SubmitResult(success: false, error: 'CSRF invalid, coba lagi');
       }
 
