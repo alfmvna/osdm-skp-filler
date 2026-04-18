@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'auth_cubit.dart';
+import '../../core/storage.dart';
 import '../dashboard/dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -19,26 +20,15 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    // Pre-fill from last saved
-    _loadSaved();
+    // Pre-fill from last saved NIP (load directly from storage)
+    _loadSavedNip();
   }
 
-  Future<void> _loadSaved() async {
-    // Load last NIP but don't auto-login (need password)
-    final lastNip = await _getLastNip();
-    if (lastNip != null) {
+  Future<void> _loadSavedNip() async {
+    final lastNip = await AppStorage.getLastNip();
+    if (lastNip != null && mounted) {
       _nipController.text = lastNip;
     }
-  }
-
-  Future<String?> _getLastNip() async {
-    final prefs = await _getStorage();
-    return prefs['lastNip'];
-  }
-
-  Future<Map<String, dynamic>> _getStorage() async {
-    // Simple approach - just return lastNip from the controller
-    return {'lastNip': _nipController.text};
   }
 
   @override
@@ -48,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  void _handleLogin(BuildContext context) {
     final nip = _nipController.text.trim();
     final password = _passwordController.text;
     if (nip.isEmpty || password.isEmpty) {
@@ -84,7 +74,8 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         },
         builder: (context, state) {
-          if (state is AuthLoading || state is AuthInitial) {
+          // Show loading spinner during login
+          if (state is AuthLoading) {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );
@@ -159,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         obscureText: _obscurePassword,
                         textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _handleLogin(),
+                        onSubmitted: (_) => _handleLogin(context),
                       ),
                       const SizedBox(height: 16),
 
@@ -176,7 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       // Login Button
                       FilledButton.icon(
-                        onPressed: (state is AuthLoading) ? null : _handleLogin,
+                        onPressed: (state is AuthLoading) ? null : () => _handleLogin(context),
                         icon: (state is AuthLoading)
                             ? const SizedBox(
                                 width: 20,
@@ -197,21 +188,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.blue[50],
+                          color: Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue[200]!),
+                          border: Border.all(color: Colors.blue.shade200),
                         ),
                         child: Column(
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.info_outline, size: 16, color: Colors.blue[700]),
+                                Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Akun OSDM Kemdikti Saintek',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.blue[700],
+                                    color: Colors.blue.shade700,
                                   ),
                                 ),
                               ],
@@ -221,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               'Gunakan NIP dan Password yang sama\ndengan login di osdm.kemdiktisaintek.go.id',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.blue[700],
+                                color: Colors.blue.shade700,
                               ),
                               textAlign: TextAlign.center,
                             ),

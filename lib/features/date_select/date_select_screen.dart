@@ -175,13 +175,13 @@ class _DateSelectScreenState extends State<DateSelectScreen> {
                               return Container(
                                 margin: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(
-                                  color: Colors.grey[200],
+                                  color: Colors.grey.shade200,
                                   shape: BoxShape.circle,
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
                                   '${day.day}',
-                                  style: TextStyle(color: Colors.grey[500]),
+                                  style: TextStyle(color: Colors.grey.shade500),
                                 ),
                               );
                             }
@@ -189,25 +189,25 @@ class _DateSelectScreenState extends State<DateSelectScreen> {
                             if (workDay != null) {
                               switch (workDay.status) {
                                 case DayStatus.filled:
-                                  bgColor = Colors.green[100];
-                                  textColor = Colors.green[800]!;
+                                  bgColor = Colors.green.shade100;
+                                  textColor = Colors.green.shade800;
                                   break;
                                 case DayStatus.unfilled:
                                   bgColor = _isSelectable(day)
-                                      ? (isSelected ? Colors.blue[100] : Colors.orange[50])
-                                      : Colors.grey[200];
+                                      ? (isSelected ? Colors.blue.shade100 : Colors.orange.shade50)
+                                      : Colors.grey.shade200;
                                   textColor = _isSelectable(day)
                                       ? Colors.black87
-                                      : Colors.grey[500];
+                                      : Colors.grey.shade500;
                                   break;
                                 case DayStatus.holiday:
-                                  bgColor = Colors.red[50];
-                                  textColor = Colors.red[800]!;
+                                  bgColor = Colors.red.shade50;
+                                  textColor = Colors.red.shade800;
                                   break;
                               }
                             } else {
-                              bgColor = Colors.grey[200];
-                              textColor = Colors.grey[500];
+                              bgColor = Colors.grey.shade200;
+                              textColor = Colors.grey.shade500;
                             }
 
                             return GestureDetector(
@@ -259,11 +259,11 @@ class _DateSelectScreenState extends State<DateSelectScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _LegendDot(color: Colors.orange[50]!, border: Colors.orange, label: 'Belum Terisi'),
+                          _LegendDot(color: Colors.orange.shade50, border: Colors.orange, label: 'Belum Terisi'),
                           const SizedBox(width: 16),
-                          _LegendDot(color: Colors.green[100]!, border: Colors.green, label: 'Sudah Terisi'),
+                          _LegendDot(color: Colors.green.shade100, border: Colors.green, label: 'Sudah Terisi'),
                           const SizedBox(width: 16),
-                          _LegendDot(color: Colors.red[50]!, border: Colors.red, label: 'Libur'),
+                          _LegendDot(color: Colors.red.shade50, border: Colors.red, label: 'Libur'),
                         ],
                       ),
                     ),
@@ -275,7 +275,7 @@ class _DateSelectScreenState extends State<DateSelectScreen> {
                           ? Center(
                               child: Text(
                                 'Klik tanggal untuk memilih',
-                                style: TextStyle(color: Colors.grey[600]),
+                                style: TextStyle(color: Colors.grey.shade600),
                               ),
                             )
                           : ListView.builder(

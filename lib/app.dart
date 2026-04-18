@@ -21,9 +21,9 @@ class OSDMApp extends StatelessWidget {
         '/': (context) => const LoginScreen(),
         '/dashboard': (context) => const DashboardScreen(),
         '/date-select': (context) => const DateSelectScreen(),
-        '/log-entry': (context) => const LogEntryScreen(),
         '/log-viewer': (context) => const LogViewerScreen(),
-        '/confirmation': (context) => const ConfirmationScreen(),
+        // Note: LogEntryScreen and ConfirmationScreen require parameters
+        // and are accessed via Navigator.push() instead of routes
       },
     );
   }

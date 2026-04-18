@@ -238,7 +238,7 @@ class _DayCard extends StatelessWidget {
                       ),
                       _DetailRow(
                         label: 'Indikator SKP',
-                        value: SkpGroups.getIndicatorNames()[log!.indikator] ??
+                        value: SkpGroups.indicatorNames[log!.indikator] ??
                             log!.indikator,
                       ),
                       _DetailRow(
@@ -298,9 +298,4 @@ class _DetailRow extends StatelessWidget {
       ),
     );
   }
-}
-
-// Extension to fix missing method
-extension on SkpGroups {
-  static Map<String, String> getIndicatorNames() => SkpGroups.indicatorNames;
 }

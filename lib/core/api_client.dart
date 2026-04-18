@@ -118,7 +118,7 @@ class ApiClient {
 
     // Parse Evo Calendar event structure from JS
     // Pattern: id:"kerja_DD_MM_YYYY", title:"...", ...
-    final eventRegex = RegExp(r'id\s*:\s*["\']kerja_(\d+)_(\d+)_(\d+)["\']\s*,\s*title\s*:\s*["\']([^"\']+)["\']');
+    final eventRegex = RegExp('id\\s*:\\s*["\']kerja_(\\d+)_(\\d+)_(\\d+)["\']\\s*,\\s*title\\s*:\\s*["\']([^"\']+)["\']');
     final matches = eventRegex.allMatches(html);
 
     for (final match in matches) {
@@ -222,23 +222,15 @@ class ApiClient {
   /// Parse a single log entry from HTML response
   LogEntry? parseLogEntry(String html) {
     try {
-      // Extract values from form fields
-      final aktivitasMatch = RegExp(
-        r'nama_aktivitas["\s][^>]*value=["\']([^"\']+)["\']',
-        dotAll: true,
-      ).firstMatch(html);
-      final descMatch = RegExp(
-        r'deskripsi["\s][^>]*value=["\']([^"\']+)["\']',
-        dotAll: true,
-      ).firstMatch(html);
+      // Parse from input fields - more robust approach
+      final nameInput = RegExp('name=["\']THarianLog\\[nama_aktivitas\\]["\']\\s+value=["\']([^"\']+)["\']').firstMatch(html);
+      final descInput = RegExp('name=["\']THarianLog\\[deskripsi\\]["\']\\s[^>]*>([^<]+)<').firstMatch(html);
 
-      // More robust: parse from input fields
-      final nameInput = RegExp(r'name=["\']THarianLog\[nama_aktivitas\]["\']\s+value=["\']([^"\']+)["\']').firstMatch(html);
-      final descInput = RegExp(r'name=["\']THarianLog\[deskripsi\]["\']\s[^>]*>([^<]+)<').firstMatch(html);
-      final indSelect = RegExp(r'<select[^>]*id=["\'][^"\']*indikator[^"\']*["\'][^>]*>.*?value=["\']([^"\']+)["\'][^>]*(?:selected|>.*?<\/select)', dotAll: true).firstMatch(html);
+      // Find selected option in indikator select
+      final indSelect = RegExp('<select[^>]*name=["\']THarianLog\\[indikator\\]["\'][^>]*>.*?<option[^>]*value=["\']([^"\']+)["\'][^>]*selected', dotAll: true).firstMatch(html);
 
       return LogEntry(
-        namaAktivitas: nameInput?.group(1) ?? descInput?.group(1) ?? '',
+        namaAktivitas: nameInput?.group(1) ?? '',
         deskripsi: descInput?.group(1) ?? '',
         indikator: indSelect?.group(1) ?? '',
       );

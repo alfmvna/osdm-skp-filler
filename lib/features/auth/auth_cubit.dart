@@ -23,12 +23,14 @@ class AuthCubit extends Cubit<AuthState> {
   AuthCubit() : super(AuthInitial());
 
   Future<void> checkAuth() async {
-    emit(AuthLoading());
+    // Check local storage first, don't show loading for simple storage read
     final saved = await AppStorage.getSavedCredentials();
     final lastNip = await AppStorage.getLastNip();
     final rememberMe = await AppStorage.getRememberMe();
 
-    if (saved != null) {
+    // Only attempt auto-login if remember me is true
+    if (saved != null && rememberMe) {
+      emit(AuthLoading());
       final result = await _api.login(
         nip: saved['nip']!,
         password: saved['password']!,
@@ -39,6 +41,7 @@ class AuthCubit extends Cubit<AuthState> {
         emit(AuthUnauthenticated(lastNip: lastNip, rememberMe: rememberMe));
       }
     } else {
+      // No saved creds or remember me off - go straight to login form
       emit(AuthUnauthenticated(lastNip: lastNip, rememberMe: rememberMe));
     }
   }
@@ -48,19 +51,23 @@ class AuthCubit extends Cubit<AuthState> {
     required String password,
     required bool rememberMe,
   }) async {
-    emit(AuthLoading());
-    if (rememberMe) {
-      await AppStorage.saveCredentials(nip: nip, password: password);
-      await AppStorage.setRememberMe(true);
-    } else {
-      await AppStorage.setRememberMe(false);
-    }
+    try {
+      emit(AuthLoading());
+      if (rememberMe) {
+        await AppStorage.saveCredentials(nip: nip, password: password);
+        await AppStorage.setRememberMe(true);
+      } else {
+        await AppStorage.setRememberMe(false);
+      }
 
-    final result = await _api.login(nip: nip, password: password);
-    if (result.success) {
-      emit(AuthAuthenticated());
-    } else {
-      emit(AuthError(result.error ?? 'Login gagal'));
+      final result = await _api.login(nip: nip, password: password);
+      if (result.success) {
+        emit(AuthAuthenticated());
+      } else {
+        emit(AuthError(result.error ?? 'Login gagal'));
+      }
+    } catch (e) {
+      emit(AuthError('Terjadi kesalahan: $e'));
     }
   }
 
