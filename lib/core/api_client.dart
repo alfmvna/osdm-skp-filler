@@ -28,21 +28,68 @@ class ApiClient {
   String? get csrfToken => _csrfToken;
   CookieJar? get cookieJar => _cookieJar;
 
-  /// Extract CSRF token from HTML response
-  void extractCsrf(String html) {
-    final csrfMatch = RegExp(r'name="_csrf"\s+value="([^"]+)"').firstMatch(html);
-    if (csrfMatch != null) {
-      _csrfToken = csrfMatch.group(1);
+  /// Extract CSRF token from HTML response - tries multiple patterns
+  String? extractCsrf(String html) {
+    // Pattern 1: Standard input field
+    var match = RegExp(r'name="_csrf"\s+value="([^"]+)"').firstMatch(html);
+    if (match != null) return match.group(1);
+
+    // Pattern 2: Single quotes around value
+    match = RegExp(r'name="_csrf"\s+value=\'([^\']+)\'').firstMatch(html);
+    if (match != null) return match.group(1);
+
+    // Pattern 3: Without quotes around name
+    match = RegExp(r'_csrf"\s+value="([^"]+)"').firstMatch(html);
+    if (match != null) return match.group(1);
+
+    // Pattern 4: Meta tag (some frameworks use this)
+    match = RegExp(r'name=["\']csrf-token["\']\s+content=["\']([^"\']+)["\']').firstMatch(html);
+    if (match != null) return match.group(1);
+
+    return null;
+  }
+
+  /// Get CSRF token from login page (for initial login)
+  Future<String?> getLoginCsrf() async {
+    try {
+      final resp = await _dio.get(
+        ApiConstants.loginUrl,
+        options: Options(
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          },
+        ),
+      );
+
+      print('Login page status: ${resp.statusCode}');
+      print('Response type: ${resp.data.runtimeType}');
+
+      if (resp.data is String) {
+        final html = resp.data.toString();
+        final token = extractCsrf(html);
+        print('CSRF token found: $token');
+        _csrfToken = token;
+        return token;
+      } else {
+        print('Response is not a string: ${resp.data}');
+      }
+      return null;
+    } catch (e) {
+      print('Error getting CSRF: $e');
+      return null;
     }
   }
 
-  /// Refresh CSRF by fetching calendar page
+  /// Refresh CSRF by fetching calendar page (after login)
   Future<bool> refreshCsrf() async {
     try {
       final resp = await _dio.get(ApiConstants.calendarUrl);
       if (resp.statusCode == 200 && resp.data is String) {
-        extractCsrf(resp.data);
-        return _csrfToken != null;
+        final token = extractCsrf(resp.data);
+        if (token != null) {
+          _csrfToken = token;
+          return true;
+        }
       }
       return false;
     } catch (e) {
@@ -56,13 +103,16 @@ class ApiClient {
     required String password,
     bool rememberMe = false,
   }) async {
-    // First get CSRF
-    final csrfOk = await refreshCsrf();
-    if (!csrfOk || _csrfToken == null) {
-      return LoginResult(success: false, error: 'Gagal mendapat CSRF token');
+    // First get CSRF from login page (not calendar page!)
+    final csrfToken = await getLoginCsrf();
+    if (csrfToken == null || _csrfToken == null) {
+      return LoginResult(success: false, error: 'Gagal mendapat CSRF token dari halaman login');
     }
 
     try {
+      print('Attempting login with NIP: $nip');
+      print('CSRF token: $_csrfToken');
+
       final resp = await _dio.post(
         ApiConstants.loginUrl,
         data: FormData.fromMap({
@@ -72,28 +122,40 @@ class ApiClient {
         }),
         options: Options(
           contentType: 'application/x-www-form-urlencoded',
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Origin': ApiConstants.baseUrl,
+            'Referer': '${ApiConstants.loginUrl}',
+          },
         ),
       );
 
+      print('Login response status: ${resp.statusCode}');
       final html = resp.data.toString();
+      print('Response contains logout: ${html.contains('logout')}');
+      print('Response contains Log Harian: ${html.contains('Log Harian')}');
 
-      // Check if login successful (has profile button, no error)
-      if (html.contains('ALLIF MAULANA') || html.contains('logout') || !html.contains('error')) {
-        // Double-check: fetch dashboard
-        final dashResp = await _dio.get(ApiConstants.calendarUrl);
-        if (dashResp.statusCode == 200) {
-          extractCsrf(dashResp.data.toString());
-          return LoginResult(success: true);
-        }
+      // Check if redirected to dashboard or still on login page
+      // If login successful, should see dashboard content or logout button
+      if (html.contains('logout') || html.contains('dashboard') || html.contains('Log Harian')) {
+        // Refresh CSRF from calendar page for subsequent requests
+        await refreshCsrf();
         return LoginResult(success: true);
-      } else if (html.contains('Kata Sandi') || html.contains('nip')) {
+      } else if (html.contains('Kata Sandi') || html.contains('Username tidak valid') || html.contains('Password tidak valid')) {
         return LoginResult(success: false, error: 'NIP atau Password salah');
+      }
+
+      // Check for error messages
+      if (html.contains('error') || html.contains('gagal')) {
+        return LoginResult(success: false, error: 'Login gagal. Periksa NIP dan Password.');
       }
 
       return LoginResult(success: false, error: 'Login gagal. Status: ${resp.statusCode}');
     } on DioException catch (e) {
+      print('DioException: ${e.message}, Type: ${e.type}, Response: ${e.response?.statusCode}');
       return LoginResult(success: false, error: 'Network error: ${e.message}');
     } catch (e) {
+      print('Exception: $e');
       return LoginResult(success: false, error: 'Error: $e');
     }
   }
@@ -103,8 +165,10 @@ class ApiClient {
     try {
       final resp = await _dio.get(ApiConstants.calendarUrl);
       if (resp.statusCode == 200) {
-        extractCsrf(resp.data.toString());
-        return resp.data.toString();
+        final html = resp.data.toString();
+        final token = extractCsrf(html);
+        if (token != null) _csrfToken = token;
+        return html;
       }
       return null;
     } catch (e) {
@@ -162,8 +226,8 @@ class ApiClient {
     String link = '',
   }) async {
     // Refresh CSRF for each submission
-    await refreshCsrf();
-    if (_csrfToken == null) {
+    final token = await getLoginCsrf();
+    if (token == null) {
       return SubmitResult(success: false, error: 'CSRF token kosong');
     }
 
